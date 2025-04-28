@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file. This projec
 
 ## v4.2.0
 * Added the Lightning Strike Contact Sensor, allowing configuration of both the minimum distance and time thresholds for triggering CONTACT_NOT_DETECTED.
+* Added option for node "^22.10.0" in `package.json` and `package-lock.json`.
 
 ## v4.1.1
 * Update README.md to correctly display "Tempest" logo.
