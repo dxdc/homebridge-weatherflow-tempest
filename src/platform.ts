@@ -332,6 +332,10 @@ export class WeatherFlowTempestPlatform implements DynamicPlatformPlugin {
         value_key = 'not_available';
       }
       break;
+    case 'Contact Sensor':
+      // No direct Observation value needed; Hardcoding this value_key.
+      value_key = 'lightning_strike_last_epoch';
+      break;
     default:
       this.log.warn('device.sensor_type not defined');
     }
