@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import { Logger } from 'homebridge';
 import axios, { AxiosInstance } from 'axios';
 import * as dgram from 'dgram';
@@ -156,7 +158,9 @@ export class TempestSocket {
 
   private setTempestData(event: any): void {
     const obs = Array.isArray(event?.obs) ? event.obs[0] : undefined;
-    if (!obs || !Array.isArray(obs)) return;
+    if (!obs || !Array.isArray(obs)) {
+      return;
+    }
 
     // Indices follow WeatherFlow Tempest UDP spec for obs_st frames.
     // wind lull: obs[1] unused
@@ -220,7 +224,9 @@ export class TempestSocket {
 
   private appendStrikeEvent(data: any): void {
     const evt = Array.isArray(data?.evt) ? data.evt : undefined;
-    if (!evt) return;
+    if (!evt) {
+      return;
+    }
 
     this.data.lightning_strike_last_epoch = toNum(evt[0], 0);
     this.data.lightning_strike_last_distance = toNum(evt[1], 0);

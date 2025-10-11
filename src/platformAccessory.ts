@@ -1,15 +1,29 @@
-import { Service, PlatformAccessory, CharacteristicValue, WithUUID } from 'homebridge';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+import {
+  Service,
+  PlatformAccessory,
+  CharacteristicValue,
+  WithUUID,
+} from 'homebridge';
 import { WeatherFlowTempestPlatform } from './platform';
 
 /**
  * Small utils
  */
-const clamp = (n: number, min: number, max: number) => Math.min(Math.max(n, min), max);
+const clamp = (n: number, min: number, max: number) =>
+  Math.min(Math.max(n, min), max);
+
 const toNum = (v: unknown, fallback = 0): number => {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 };
+
 const mphFromMS = (ms: number) => ms * 2.236936;
+
+/** Safe observation accessor for dynamic keys */
+const obs = (platform: WeatherFlowTempestPlatform, key: string) =>
+  (platform.observation_data as unknown as Record<string, unknown>)?.[key];
 
 /**
  * Centralized polling helper to remove repetitive setInterval and updateValue boilerplate.
@@ -30,7 +44,7 @@ function wirePollingCharacteristic(
   service.getCharacteristic(char).updateValue(getter());
 
   // poll
-  const intervalMs = (platform.config.interval as number || 10) * 1000;
+  const intervalMs = ((platform.config.interval as number) || 10) * 1000;
   setInterval(() => {
     try {
       service.getCharacteristic(char).updateValue(getter());
@@ -64,8 +78,13 @@ class TemperatureSensor {
 
   private getCurrentTemperature(): number {
     try {
-      const key: string = this.accessory.context.device.temperature_properties.value_key;
-      const c = toNum(this.platform.observation_data[key], -270);
+      const key: string | undefined =
+        this.accessory.context.device?.temperature_properties?.value_key;
+      if (!key) {
+        return -270;
+      }
+
+      const c = toNum(obs(this.platform, key), -270);
       if (c > 100) {
         this.platform.log.debug(`WeatherFlow Tempest temp > 100C: ${c}C`);
         return 100;
@@ -106,8 +125,13 @@ class LightSensor {
 
   private getCurrentLux(): number {
     try {
-      const key: string = this.accessory.context.device.light_properties.value_key;
-      const lux = toNum(this.platform.observation_data[key], 0.0001);
+      const key: string | undefined =
+        this.accessory.context.device?.light_properties?.value_key;
+      if (!key) {
+        return 0.0001;
+      }
+
+      const lux = toNum(obs(this.platform, key), 0.0001);
       if (lux < 0.0001) {
         this.platform.log.debug(`WeatherFlow Tempest lux < 0.0001: ${lux}`);
         return 0.0001;
@@ -148,8 +172,13 @@ class HumiditySensor {
 
   private getCurrentRelativeHumidity(): number {
     try {
-      const key: string = this.accessory.context.device.humidity_properties.value_key;
-      const rh = Math.round(toNum(this.platform.observation_data[key], 0));
+      const key: string | undefined =
+        this.accessory.context.device?.humidity_properties?.value_key;
+      if (!key) {
+        return 0;
+      }
+
+      const rh = Math.round(toNum(obs(this.platform, key), 0));
       if (rh > 100) {
         this.platform.log.debug(`WeatherFlow Tempest RH > 100%: ${rh}%`);
         return 100;
@@ -190,8 +219,13 @@ class MotionSensor {
 
   private windSpeedRounded(): number {
     try {
-      const key: string = this.accessory.context.device.motion_properties.value_key;
-      const ms = toNum(this.platform.observation_data[key], 0);
+      const key: string | undefined =
+        this.accessory.context.device?.motion_properties?.value_key;
+      if (!key) {
+        return 0;
+      }
+
+      const ms = toNum(obs(this.platform, key), 0);
       const useMetric = this.platform.config.units === 'Metric';
       const speed = useMetric ? Math.round(ms) : Math.round(mphFromMS(ms));
       return Math.max(speed, 0);
@@ -205,7 +239,12 @@ class MotionSensor {
     const current = this.windSpeedRounded();
     let trigger = 1;
     try {
-      trigger = this.accessory.context.device.motion_properties.trigger_value;
+      const t = this.accessory.context.device?.motion_properties?.trigger_value;
+      if (typeof t === 'number') {
+        trigger = t;
+      } else {
+        this.platform.log.warn('Defaulting to 1 as motion trigger value.');
+      }
     } catch (e) {
       this.platform.log.error(String(e));
       this.platform.log.warn('Defaulting to 1 as motion trigger value.');
@@ -241,21 +280,26 @@ class Fan {
 
   private getCurrentWindSpeedPercent(): number {
     try {
-      const key: string = this.accessory.context.device.fan_properties.value_key;
-      const ms = toNum(this.platform.observation_data[key], 0);
+      const key: string | undefined =
+        this.accessory.context.device?.fan_properties?.value_key;
+      if (!key) {
+        return 0;
+      }
+
+      const ms = toNum(obs(this.platform, key), 0);
 
       if (this.platform.config.units === 'Metric') {
         // treat m/s range 0..45 as 0..45 percent
         const mps = clamp(Math.round(ms), 0, 45);
         if (mps === 45) {
-          this.platform.log.debug(`WeatherFlow Tempest wind > 45 m/s, clamped`);
+          this.platform.log.debug('WeatherFlow Tempest wind > 45 m/s, clamped');
         }
         return mps;
       } else {
         // treat mph range 0..100 as 0..100 percent
         const mph = clamp(Math.round(mphFromMS(ms)), 0, 100);
         if (mph === 100) {
-          this.platform.log.debug(`WeatherFlow Tempest wind > 100 mph, clamped`);
+          this.platform.log.debug('WeatherFlow Tempest wind > 100 mph, clamped');
         }
         return mph;
       }
@@ -281,7 +325,7 @@ class OccupancySensor {
       this.accessory.addService(this.platform.Service.OccupancySensor);
 
     // name + detected state are both polled
-    const intervalMs = (this.platform.config.interval as number || 10) * 1000;
+    const intervalMs = ((this.platform.config.interval as number) || 10) * 1000;
 
     this.service
       .getCharacteristic(this.platform.Characteristic.OccupancyDetected)
@@ -300,7 +344,8 @@ class OccupancySensor {
   }
 
   private refresh() {
-    const sensorName = this.accessory.context.device.name;
+    const sensorName: string =
+      this.accessory.context.device?.name ?? this.accessory.displayName;
     const [value, units, trip] = this.getOccupancySensorValue();
 
     this.service
@@ -314,85 +359,93 @@ class OccupancySensor {
 
   private getOccupancySensorValue(): [value: number, units: string, trip: number] {
     try {
-      const props = this.accessory.context.device.occupancy_properties;
-      const key: string = props.value_key;
-      let trip = props.trigger_value;
-      let value = toNum(this.platform.observation_data[key], 0);
+      const props = this.accessory.context.device?.occupancy_properties;
+      const key: string | undefined = props?.value_key;
+      let trip = typeof props?.trigger_value === 'number' ? props!.trigger_value : 0;
+
+      if (!key) {
+        return [0, '', 1000];
+      }
+      if (trip < 0) {
+        trip = 0;
+      }
+
+      let value = toNum(obs(this.platform, key), 0);
       let units = '';
 
-      if (trip < 0) trip = 0;
-
       switch (key) {
-        case 'barometric_pressure': {
-          if (this.platform.config.units === 'Metric') {
-            value = Math.round(value * 1000) / 1000;
-            units = 'mb';
-          } else {
-            value = Math.round((value / 33.8638) * 1000) / 1000;
-            units = 'inHg';
-          }
-          break;
+      case 'barometric_pressure': {
+        if (this.platform.config.units === 'Metric') {
+          value = Math.round(value * 1000) / 1000;
+          units = 'mb';
+        } else {
+          value = Math.round((value / 33.8638) * 1000) / 1000;
+          units = 'inHg';
         }
-        case 'precip': {
-          if (this.platform.config.units === 'Metric') {
-            value = Math.round(value * 100) / 100;
-            units = 'mm/min';
-          } else {
-            value = Math.round((value * 2.36) * 100) / 100; // mm/min -> in/hr
-            units = 'in/hr';
-          }
-          break;
+        break;
+      }
+      case 'precip': {
+        if (this.platform.config.units === 'Metric') {
+          value = Math.round(value * 100) / 100;
+          units = 'mm/min';
+        } else {
+          value = Math.round(value * 2.36 * 100) / 100; // mm/min -> in/hr
+          units = 'in/hr';
         }
-        case 'precip_accum_local_day': {
-          if (this.platform.config.units === 'Metric') {
-            value = Math.round(value * 100) / 100;
-            units = 'mm';
-          } else {
-            value = Math.round((value / 25.4) * 100) / 100;
-            units = 'in';
-          }
-          break;
+        break;
+      }
+      case 'precip_accum_local_day': {
+        if (this.platform.config.units === 'Metric') {
+          value = Math.round(value * 100) / 100;
+          units = 'mm';
+        } else {
+          value = Math.round((value / 25.4) * 100) / 100;
+          units = 'in';
         }
-        case 'solar_radiation':
-          units = 'W/m\xB2';
-          break;
-        case 'uv':
-          value = Math.round(value * 10) / 10;
-          units = ' ';
-          break;
-        case 'wind_direction': {
-          const cat = Math.round((value % 360) / 22.5);
-          const dirs = [
-            '\xB0 N',
-            '\xB0 NNE',
-            '\xB0 NE',
-            '\xB0 ENE',
-            '\xB0 E',
-            '\xB0 ESE',
-            '\xB0 SE',
-            '\xB0 SSE',
-            '\xB0 S',
-            '\xB0 SSW',
-            '\xB0 SW',
-            '\xB0 WSW',
-            '\xB0 W',
-            '\xB0 WNW',
-            '\xB0 NW',
-            '\xB0 NNW',
-            '\xB0 N',
-          ];
-          units = dirs[clamp(cat, 0, 16)];
-          break;
-        }
-        default:
-          break;
+        break;
+      }
+      case 'solar_radiation':
+        units = 'W/m\xB2';
+        break;
+      case 'uv':
+        value = Math.round(value * 10) / 10;
+        units = ' ';
+        break;
+      case 'wind_direction': {
+        const cat = Math.round((value % 360) / 22.5);
+        const dirs = [
+          '\xB0 N',
+          '\xB0 NNE',
+          '\xB0 NE',
+          '\xB0 ENE',
+          '\xB0 E',
+          '\xB0 ESE',
+          '\xB0 SE',
+          '\xB0 SSE',
+          '\xB0 S',
+          '\xB0 SSW',
+          '\xB0 SW',
+          '\xB0 WSW',
+          '\xB0 W',
+          '\xB0 WNW',
+          '\xB0 NW',
+          '\xB0 NNW',
+          '\xB0 N',
+        ];
+        units = dirs[clamp(cat, 0, 16)];
+        break;
+      }
+      default:
+        break;
       }
 
       if (value < 0) {
         this.platform.log.debug(`WeatherFlow Tempest ${key} < 0: ${value}`);
         value = 0;
       } else {
-        this.platform.log.debug(`WeatherFlow Tempest ${key}: ${value} ${units}, trip: ${trip}`);
+        this.platform.log.debug(
+          `WeatherFlow Tempest ${key}: ${value} ${units}, trip: ${trip}`,
+        );
       }
 
       return [value, units, trip];
@@ -403,7 +456,7 @@ class OccupancySensor {
   }
 
   private isOccupancyDetected(): boolean {
-    const [v, _u, trip] = this.getOccupancySensorValue();
+    const [v, _u, trip] = this.getOccupancySensorValue(); // eslint-disable-line @typescript-eslint/no-unused-vars
     return v >= trip;
   }
 }
@@ -437,7 +490,9 @@ class ContactSensor {
         tick++;
         if (tick === 5) {
           tick = 0;
-          if (this.state === 1) this.setCharacteristicState(0);
+          if (this.state === 1) {
+            this.setCharacteristicState(0);
+          }
         }
         this.setCharacteristicState(this.getState());
       } catch (e) {
@@ -448,9 +503,18 @@ class ContactSensor {
 
   private getState(): number {
     try {
-      const lastEpoch: number = toNum(this.platform.observation_data.lightning_strike_last_epoch, 0);
-      const lastDistance: number = toNum(this.platform.observation_data.lightning_strike_last_distance, 0);
-      const triggerDistance: number = toNum(this.accessory.context.device.contact_properties.trigger_distance, 0);
+      const lastEpoch = toNum(
+        (this.platform.observation_data as any)?.lightning_strike_last_epoch,
+        0,
+      );
+      const lastDistance = toNum(
+        (this.platform.observation_data as any)?.lightning_strike_last_distance,
+        0,
+      );
+      const triggerDistance = toNum(
+        this.accessory.context.device?.contact_properties?.trigger_distance,
+        0,
+      );
       const now = Math.floor(Date.now() / 1000);
 
       if (
@@ -486,7 +550,10 @@ export class InitWeatherFlowTempestPlatform {
   ) {
     this.accessory
       .getService(this.platform.Service.AccessoryInformation)!
-      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'WeatherFlow')
+      .setCharacteristic(
+        this.platform.Characteristic.Manufacturer,
+        'WeatherFlow',
+      )
       .setCharacteristic(this.platform.Characteristic.Model, 'Tempest')
       .setCharacteristic(
         this.platform.Characteristic.SerialNumber,
@@ -510,7 +577,10 @@ class BatterySensor {
   ) {
     this.service =
       this.accessory.getService(this.platform.Service.Battery) ||
-      this.accessory.addService(this.platform.Service.Battery, 'Tempest Battery');
+      this.accessory.addService(
+        this.platform.Service.Battery,
+        'Tempest Battery',
+      );
 
     wirePollingCharacteristic(
       this.platform,
@@ -549,41 +619,47 @@ export class WeatherFlowTempestPlatformAccessory {
   ) {
     this.accessory
       .getService(this.platform.Service.AccessoryInformation)!
-      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'WeatherFlow')
+      .setCharacteristic(
+        this.platform.Characteristic.Manufacturer,
+        'WeatherFlow',
+      )
       .setCharacteristic(
         this.platform.Characteristic.Model,
-        `Tempest - ${this.accessory.context.device.name}`,
+        `Tempest - ${this.accessory.context.device?.name ?? this.accessory.displayName}`,
       )
       .setCharacteristic(
         this.platform.Characteristic.SerialNumber,
         `${this.platform.config.station_id}`,
       );
 
-    switch (this.accessory.context.device.sensor_type) {
-      case 'Temperature Sensor':
-        new TemperatureSensor(this.platform, this.accessory);
-        if (this.accessory.context.device.temperature_properties.value_key === 'air_temperature') {
-          new BatterySensor(this.platform, this.accessory);
-        }
-        break;
-      case 'Light Sensor':
-        new LightSensor(this.platform, this.accessory);
-        break;
-      case 'Humidity Sensor':
-        new HumiditySensor(this.platform, this.accessory);
-        break;
-      case 'Motion Sensor':
-        new MotionSensor(this.platform, this.accessory);
-        break;
-      case 'Fan':
-        new Fan(this.platform, this.accessory);
-        break;
-      case 'Occupancy Sensor':
-        new OccupancySensor(this.platform, this.accessory);
-        break;
-      case 'Contact Sensor':
-        new ContactSensor(this.platform, this.accessory);
-        break;
+    switch (this.accessory.context.device?.sensor_type) {
+    case 'Temperature Sensor':
+      new TemperatureSensor(this.platform, this.accessory);
+      if (
+        this.accessory.context.device?.temperature_properties?.value_key ===
+          'air_temperature'
+      ) {
+        new BatterySensor(this.platform, this.accessory);
+      }
+      break;
+    case 'Light Sensor':
+      new LightSensor(this.platform, this.accessory);
+      break;
+    case 'Humidity Sensor':
+      new HumiditySensor(this.platform, this.accessory);
+      break;
+    case 'Motion Sensor':
+      new MotionSensor(this.platform, this.accessory);
+      break;
+    case 'Fan':
+      new Fan(this.platform, this.accessory);
+      break;
+    case 'Occupancy Sensor':
+      new OccupancySensor(this.platform, this.accessory);
+      break;
+    case 'Contact Sensor':
+      new ContactSensor(this.platform, this.accessory);
+      break;
     }
   }
 }
