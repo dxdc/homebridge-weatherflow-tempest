@@ -40,12 +40,14 @@ export class TempestSocket {
   private s: dgram.Socket;
   private data: object | undefined;
   private tempest_battery_level: number;
+  private last_data_timestamp: number;
 
   constructor(log: Logger, reuse_address: boolean) {
 
     this.log = log;
     this.data = undefined;
     this.tempest_battery_level = 0;
+    this.last_data_timestamp = 0;
     this.s = dgram.createSocket({ type: 'udp4', reuseAddr: reuse_address });
 
     this.log.info('TempestSocket initialized.');
@@ -89,6 +91,7 @@ export class TempestSocket {
 
   private setTempestData(data): void {
 
+    this.last_data_timestamp = Date.now();
     const obs = data.obs[0];
     // const windLull = (obs[1] !== null) ? obs[1] : 0;
     const windSpeed = (obs[2] !== null) ? obs[2] * 2.2369 : 0; // convert to mph for heatindex calculation
@@ -147,6 +150,10 @@ export class TempestSocket {
 
   public getBatteryLevel(): number {
     return this.tempest_battery_level;
+  }
+
+  public getLastDataTimestamp(): number {
+    return this.last_data_timestamp;
   }
 
 }

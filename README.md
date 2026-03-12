@@ -37,10 +37,42 @@ Local API is now supported which requires no authentication. If you choose to us
 
 - `name`: _(Required)_ Must always be set to `WeatherFlow Tempest Platform`.
 - `local_api`: _(Required)_ Use the Local API versus HTTP API.
+- `local_api_port`: _(Optional, Local API only)_ UDP port to listen on for Tempest hub broadcasts. Defaults to `50222`. Only change this if you need to remap the port (e.g., in a Docker container or behind a UDP relay).
 - `token`: _(Required for HTTP API)_ Oauth2 Personal Use Token, create via your tempestwx account.
 - `station_id`: _(Required for HTTP API)_ The station ID you are pulling weather data from.
 - `interval`: _(Required for HTTP API)_ How often to poll the Tempest REST API. Default 10 seconds. Minimum every second.
 - `local_api_shared`: _(Optional)_ enable multicast. Will reuse the address, even if another process has already bound a socket on it, but only one socket can receive the data. Default: False.
+
+### Firewall Configuration (Required for Local API)
+
+The Tempest hub broadcasts weather observations via UDP on port **50222** (or your configured `local_api_port`). The host running Homebridge **must** allow incoming UDP traffic on this port or the plugin will not receive any data.
+
+> **Important:** The Tempest hub uses UDP broadcast, so the Homebridge host must be on the **same Layer 2 network** (subnet/VLAN) as the hub. Broadcasts do not cross routers or VLANs without additional configuration (e.g., a UDP relay/proxy).
+
+**Linux (ufw):**
+```bash
+sudo ufw allow 50222/udp
+```
+
+**Linux (firewalld):**
+```bash
+sudo firewall-cmd --permanent --add-port=50222/udp
+sudo firewall-cmd --reload
+```
+
+**Linux (iptables):**
+```bash
+sudo iptables -A INPUT -p udp --dport 50222 -j ACCEPT
+```
+
+**macOS:**
+If the macOS application firewall is enabled, ensure that Node.js (or the Homebridge process) is allowed to accept incoming connections. You may be prompted automatically on first run.
+
+**Docker / Containers:**
+You must map UDP port 50222 into the container:
+```bash
+docker run ... -p 50222:50222/udp ...
+```
 - `sensors`: _(Required)_ An array of sensors to create. This is dynamic incase you want to target different temperature or wind speed attributes.
 - `sensors[].name`: _(Required)_ Display name of Sensor in Apple Home.
 - `sensors[].sensor_type`: _(Required)_ The type of Home Sensor to create. There are 6 options ["Temperature Sensor", "Light Sensor", "Humidity Sensor", "Fan", "Motion Sensor", "Occupancy Sensor"].
@@ -79,6 +111,7 @@ sensor_type `{2}` | value_key | metric units | std units | additional_properties
 {
   "name": "WeatherFlow Tempest Platform",
   "local_api": true,
+  "local_api_port": 50222,
   "station_id": 10000,
   "units": "Standard",
   "local_api_shared": false,
