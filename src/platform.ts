@@ -129,8 +129,8 @@ export class WeatherFlowTempestPlatform implements DynamicPlatformPlugin {
 
     try {
       this.log.info('Using Tempest Local API.');
-      if (!('local_api_port' in this.config)) {
-        this.config['local_api_port'] = 50222;
+      if (typeof this.config.local_api_port !== 'number') {
+        this.config.local_api_port = 50222;
       }
       this.tempestSocket = new TempestSocket(this.log, this.config.local_api_shared);
       this.tempestSocket.start('0.0.0.0', this.config.local_api_port);
