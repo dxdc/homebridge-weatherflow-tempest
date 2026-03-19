@@ -2,18 +2,11 @@
 
 [![verified-by-homebridge](https://badgen.net/badge/homebridge/verified/purple)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins) ![npm-version](https://badgen.net/npm/v/homebridge-weatherflow-tempest?icon=npm&label) ![npm-downloads](https://badgen.net/npm/dt/homebridge-weatherflow-tempest?icon=npm&label) [![donate](https://badgen.net/badge/donate/paypal/yellow)](https://paypal.me/chasenicholl)
 
-<table align="center">
-  <tr>
-    <td>
-      <img src="https://user-images.githubusercontent.com/3979615/78016493-9b89a800-7396-11ea-9442-414ad9ffcdf2.png" width="200" />
-    </td>
-    <td>
-      <img src="https://t9s9z3m3.rocketcdn.me/wp-content/uploads/2016/05/Tempest-powered-by-01.svg" width="250" />
-    </td>
-  </tr>
-</table>
-
-*New* in v4.0.0 Local API Support!
+<p align="center">
+  <img src="https://user-images.githubusercontent.com/3979615/78016493-9b89a800-7396-11ea-9442-414ad9ffcdf2.png" width="100" />
+<br>
+  <img src="https://t9s9z3m3.rocketcdn.me/wp-content/uploads/2016/05/Tempest-powered-by-01.svg" width="100" />
+</p>
 
 Homebridge Plugin providing basic WeatherFlow Tempest support. Exposing 7 Acessories.
 
@@ -27,20 +20,43 @@ Homebridge Plugin providing basic WeatherFlow Tempest support. Exposing 7 Acesso
 
 <br>
 
----
-<u><h3 align=center>NOTE:</h3></u>
-
-It is recommended when upgrading to v3.0 of the plugin from a prior version that you save your configuration information including `token` and `station_id`, uninstall the prior version of the plugin, restart Homebridge to clear the accessory cache, install v3.0 of the plugin, enter your Settings, and finally restart Homebridge to initialize the plugin.
-
----
-<br>
-
 ### Setup and Parameters
 
 Local API is now supported which requires no authentication. If you choose to use the non-local HTTP API you will need to create an account at https://tempestwx.com/ and then generate a Personal Use Token https://tempestwx.com/settings/tokens.
 
 - `name`: _(Required)_ Must always be set to `WeatherFlow Tempest Platform`.
 - `local_api`: _(Required)_ Use the Local API versus HTTP API.
+- `local_api_port`: _(Optional, Local API only)_ UDP port to listen on for Tempest hub broadcasts. Defaults to `50222`. Only change this if you need to remap the port (e.g., in a Docker container or behind a UDP relay).
+> ### Firewall Configuration (Required for Local API)
+
+> The Tempest hub broadcasts weather observations via UDP on port **50222** (or your configured `local_api_port`). The host running Homebridge **must** allow incoming UDP traffic on this port or the plugin will not receive any data.
+
+> > **Important:** The Tempest hub uses UDP broadcast, so the Homebridge host must be on the **same Layer 2 network** (subnet/VLAN) as the hub. Broadcasts do not cross routers or VLANs without additional configuration (e.g., a UDP relay/proxy).
+
+> **Linux (ufw):**
+> ```bash
+> sudo ufw allow 50222/udp
+> ```
+
+> **Linux (firewalld):**
+> ```bash
+> sudo firewall-cmd --permanent --add-port=50222/udp
+> sudo firewall-cmd --reload
+> ```
+
+> **Linux (iptables):**
+> ```bash
+> sudo iptables -A INPUT -p udp --dport 50222 -j ACCEPT
+> ```
+
+> **macOS:**
+> If the macOS application firewall is enabled, ensure that Node.js (or the Homebridge process) is allowed to accept incoming connections. You may be prompted automatically on first run.
+
+> **Docker / Containers:**
+> You must map UDP port 50222 into the container:
+> ```bash
+> docker run ... -p 50222:50222/udp ...
+> ```
 - `token`: _(Required for HTTP API)_ Oauth2 Personal Use Token, create via your tempestwx account.
 - `station_id`: _(Required for HTTP API)_ The station ID you are pulling weather data from.
 - `interval`: _(Required for HTTP API)_ How often to poll the Tempest REST API. Default 10 seconds. Minimum every second.
@@ -84,6 +100,7 @@ sensor_type `{2}` | value_key | metric units | std units | additional_properties
 {
   "name": "WeatherFlow Tempest Platform",
   "local_api": true,
+  "local_api_port": 50222,
   "station_id": 10000,
   "units": "Standard",
   "local_api_shared": false,

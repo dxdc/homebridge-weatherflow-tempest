@@ -23,6 +23,17 @@
         "required": false,
         "default": false
       },
+      "local_api_port": {
+        "title": "Local API UDP Port",
+        "type": "integer",
+        "default": 50222,
+        "minimum": 1,
+        "maximum": 65535,
+        "description": "UDP port to listen on for Tempest hub broadcasts. Default is 50222. Only change this if you have port forwarding or container port remapping in place.",
+        "condition": {
+          "functionBody": "return model.local_api === true;"
+        }
+      },
       "token": {
         "title": "Token",
         "type": "string",

@@ -129,8 +129,11 @@ export class WeatherFlowTempestPlatform implements DynamicPlatformPlugin {
 
     try {
       this.log.info('Using Tempest Local API.');
+      if (!('local_api_port' in this.config)) {
+        this.config['local_api_port'] = 50222;
+      }
       this.tempestSocket = new TempestSocket(this.log, this.config.local_api_shared);
-      this.tempestSocket.start();
+      this.tempestSocket.start('0.0.0.0', this.config.local_api_port);
 
       // Hold thread for first message and set values
       await this.socketDataRecieved();
@@ -155,6 +158,7 @@ export class WeatherFlowTempestPlatform implements DynamicPlatformPlugin {
   private socketDataRecieved(): Promise<void> {
     this.log.info('Waiting for first local broadcast. This could take up to 60 seconds...');
     return new Promise((resolve) => {
+      let waitSeconds = 0;
       const socket_interval = setInterval(() => {
         if (this.tempestSocket === undefined) {
           return;
@@ -163,6 +167,15 @@ export class WeatherFlowTempestPlatform implements DynamicPlatformPlugin {
           clearInterval(socket_interval);
           this.log.info('Initial local broadcast recieved.');
           resolve();
+        } else {
+          waitSeconds += 1;
+          if (waitSeconds > 0 && waitSeconds % 90 === 0) {
+            this.log.warn(
+              `No UDP data received after ${waitSeconds} seconds. ` +
+              'Ensure UDP port is not blocked by a firewall and that the Homebridge host ' +
+              'is on the same subnet/VLAN as the Tempest hub.',
+            );
+          }
         }
       }, 1000);
     });
@@ -224,6 +237,17 @@ export class WeatherFlowTempestPlatform implements DynamicPlatformPlugin {
     setInterval(() => {
       if (this.tempestSocket === undefined) {
         return;
+      }
+      // Check for stale data (no broadcast received in over 3 minutes)
+      const lastTimestamp = this.tempestSocket.getLastDataTimestamp();
+      if (lastTimestamp > 0) {
+        const staleSec = (Date.now() - lastTimestamp) / 1000;
+        if (staleSec > 180) {
+          this.log.warn(
+            `No UDP broadcast received in ${Math.round(staleSec)} seconds. ` +
+            'The Tempest hub may be offline or unreachable.',
+          );
+        }
       }
       // Update values
       this.observation_data = this.tempestSocket.getStationCurrentObservation();

@@ -87,7 +87,8 @@ export class TempestSocket {
   private readonly log: Logger;
   private readonly s: dgram.Socket;
   private data: Observation;
-  private tempest_battery_level = 0;
+  private tempest_battery_level: number = 0;
+  private last_data_timestamp: number = 0;
 
   constructor(log: Logger, reuse_address: boolean) {
     this.log = log;
@@ -116,6 +117,7 @@ export class TempestSocket {
   }
 
   public start(address = '0.0.0.0', port = 50222) {
+    this.log.info(`Listening for Tempest UDP broadcasts at address ${address} on port ${port}.`);
     this.setupSocket(address, port);
     this.setupSignalHandlers();
   }
@@ -161,6 +163,8 @@ export class TempestSocket {
     if (!obs || !Array.isArray(obs)) {
       return;
     }
+
+    this.last_data_timestamp = Date.now();
 
     // Indices follow WeatherFlow Tempest UDP spec for obs_st frames.
     // wind lull: obs[1] unused
@@ -257,6 +261,11 @@ export class TempestSocket {
   public getBatteryLevel(): number {
     return this.tempest_battery_level;
   }
+
+  public getLastDataTimestamp(): number {
+    return this.last_data_timestamp;
+  }
+
 }
 
 /* ---------------------------------- */

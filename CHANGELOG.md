@@ -41,6 +41,12 @@ Jumping ahead to version 5.0.0. Cleaning up code.
 * Enforced strict typing and removed implicit any usage
 * Cleaned up redundant comments and ESLint suppressions
 * Improved readability, type safety, and maintainability without changing runtime behavior
+* Added configurable UDP port via new optional `local_api_port` setting (defaults to `50222`). Useful for Docker containers, port forwarding, and UDP relay setups.
+* Added firewall configuration documentation to README for Linux (ufw, firewalld, iptables), macOS, and Docker.
+* Added same-subnet/VLAN networking requirement note for Local API users.
+* Log the configured UDP port on startup when using Local API.
+* Added periodic warning when no UDP data is received during initial startup (every 90 seconds) with troubleshooting hints.
+* Added stale data detection: warns if no broadcast received in over 3 minutes after initial connection.
 
 ## v4.2.0
 * Added the Lightning Strike Contact Sensor, allowing configuration of both the minimum distance and time thresholds for triggering CONTACT_NOT_DETECTED.
