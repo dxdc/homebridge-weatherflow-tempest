@@ -2,6 +2,54 @@
 
 All notable changes to this project will be documented in this file. This project uses [Semantic Versioning](https://semver.org/).
 
+## v5.0.1
+* Centralized polling: added a wirePollingCharacteristic helper that wires onGet, sets the initial value, and updates on an interval. This removed a lot of repeated setInterval and updateValue code.
+* Small utilities: added clamp, toNum (safe numeric parsing), and mphFromMS so conversions and bounds are clearer and consistent.
+* Stronger typing and logs: imported CharacteristicValue, standardized debug logs in each onGet, and wrapped interval updates in try/catch to avoid silent failures.
+* Consistent bounds and units:
+* Temperature, lux, humidity, battery now clamp and log at limits in one place.
+* Motion/wind uses a single rounding path and unit conversion with clear metric vs imperial handling.
+* Fan maps wind speed to a percent with explicit caps (0..45 m/s or 0..100 mph) and logs when clamped.
+* Occupancy cleanup:
+* Extracted a refresh() that sets both the accessory Name (with live reading) and OccupancyDetected.
+* Simplified unit/format logic, including a compact wind-direction lookup table.
+* Normalized negative values to zero with a single debug.
+* Contact sensor polish: kept the 1s ticker and 5s auto-reset but guarded the loop with try/catch and simplified the epoch/distance checks.
+* Accessory metadata: left behavior the same, but made the routing class a bit tighter and consistent with the new helpers.
+* Fewer magic numbers: grouped conversions, used shared helpers, and removed repeated literals where possible.
+* Created a shared Axios client (http) with base URL, 10 s timeout, keep-alive agent, and unified status validation
+* Added TypeScript interfaces for API responses (StationObsResponse, DeviceObsResponse, StationsResponse)
+* Introduced utility helpers:
+* toNum() – safe numeric parsing
+* mphFromMS() – convert m/s → mph
+* cToF() / fToC() – temperature conversions
+* Rewrote UDP socket setup for clarity and stability
+* Logs bound address/port on listen
+* Centralized error handling and JSON parsing
+* Safe guards for invalid or malformed UDP packets
+* Simplified heat index and wind-chill calculations using descriptive variable names
+* Improved battery percentage formula readability (2.8 V = 100%, 1.8 V = 0%)
+* Added consistent unit annotations and inline comments across all observation fields
+* Consolidated signal-handler logic (SIGINT, SIGTERM) into a single reusable shutdown handler
+* Improved retry mechanism in getStationCurrentObservation() with capped recursion and delay back-off
+* Replaced .then()/.catch() chains with modern async/await + try/catch syntax
+* Added authHeaders() helper for consistent Bearer token usage
+* Unified logging style (info, warn, error) with clearer, contextual messages
+* Ensured all network and UDP operations are gracefully recoverable on error
+* Enforced strict typing and removed implicit any usage
+* Cleaned up redundant comments and ESLint suppressions
+* Improved readability, type safety, and maintainability without changing runtime behavior
+* Added configurable UDP port via new optional `local_api_port` setting (defaults to `50222`). Useful for Docker containers, port forwarding, and UDP relay setups.
+* Added firewall configuration documentation to README for Linux (ufw, firewalld, iptables), macOS, and Docker.
+* Added same-subnet/VLAN networking requirement note for Local API users.
+* Log the configured UDP port on startup when using Local API.
+* Added periodic warning when no UDP data is received during initial startup (every 90 seconds) with troubleshooting hints.
+* Added stale data detection: warns if no broadcast received in over 3 minutes after initial connection.
+
+## v4.2.0
+* Added the Lightning Strike Contact Sensor, allowing configuration of both the minimum distance and time thresholds for triggering CONTACT_NOT_DETECTED.
+* Added option for node "^22.10.0" in `package.json` and `package-lock.json`.
+
 ## v4.1.1
 * Update README.md to correctly display "Tempest" logo.
 * Update README.md to include `station_id` in "Local API Config Example".
