@@ -2,9 +2,7 @@
 
 All notable changes to this project will be documented in this file. This project uses [Semantic Versioning](https://semver.org/).
 
-## v5.0.0
-Jumping ahead to version 5.0.0. Cleaning up code.
-
+## v5.0.1
 * Centralized polling: added a wirePollingCharacteristic helper that wires onGet, sets the initial value, and updates on an interval. This removed a lot of repeated setInterval and updateValue code.
 * Small utilities: added clamp, toNum (safe numeric parsing), and mphFromMS so conversions and bounds are clearer and consistent.
 * Stronger typing and logs: imported CharacteristicValue, standardized debug logs in each onGet, and wrapped interval updates in try/catch to avoid silent failures.
